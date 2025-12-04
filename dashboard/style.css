@@ -1,0 +1,104 @@
+/* Global Styles */
+.stApp {
+    background-color: #0E1117;
+    font-family: 'Inter', sans-serif;
+}
+
+h1,
+h2,
+h3 {
+    color: #F3F4F6 !important;
+    font-weight: 700 !important;
+}
+
+/* Metric Cards */
+.metric-card {
+    background-color: #1F2937;
+    border: 1px solid #374151;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transition: transform 0.2s;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+    border-color: #4F46E5;
+}
+
+.metric-label {
+    color: #9CA3AF;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.metric-value {
+    color: #F9FAFB;
+    font-size: 1.875rem;
+    font-weight: 700;
+    margin-top: 0.5rem;
+}
+
+/* Text Highlights */
+.highlight-green {
+    color: #10B981;
+    font-weight: bold;
+}
+
+.highlight-red {
+    color: #EF4444;
+    font-weight: bold;
+}
+
+/* Section Headers */
+.section-header {
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #374151;
+    font-size: 1.5rem;
+    color: #E5E7EB;
+}
+
+/* Insight Box */
+.insight-box {
+    background-color: rgba(79, 70, 229, 0.1);
+    border-left: 4px solid #4F46E5;
+    padding: 1rem;
+    margin: 1rem 0;
+    border-radius: 0 0.5rem 0.5rem 0;
+}
+
+/* Tooltip */
+.tooltip {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+}
+
+.tooltip .tooltiptext {
+    visibility: hidden;
+    width: 200px;
+    background-color: #111827;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 5px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -100px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    border: 1px solid #374151;
+    font-size: 0.75rem;
+}
+
+.tooltip:hover .tooltiptext {
+    visibility: visible;
+    opacity: 1;
+}
