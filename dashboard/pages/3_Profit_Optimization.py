@@ -30,11 +30,18 @@ df_bandit = bandit_stats["policy_comparison"]
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    fig = utils.px.bar(df_bandit, x="Policy", y="Avg Profit per User", color="Policy",
-                 title="Average Profit per User by Policy",
-                 color_discrete_sequence=["#EF4444", "#10B981", "#6366F1"])
-    fig.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-    st.plotly_chart(fig, width='stretch')
+    fig = utils.px.bar(
+        df_bandit,
+        x="Policy", y="Avg Profit per User", color="Policy",
+        title="Average Profit per User by Policy",
+        color_discrete_sequence=["#EF4444", "#10B981", "#6366F1"]
+    )
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 with col2:
     st.dataframe(df_bandit, hide_index=True)
@@ -46,18 +53,16 @@ st.markdown('<div class="section-header">2. Interactive Profit Simulator</div>',
 st.markdown("Adjust the **Ad Cost** and **Conversion Value** in the sidebar to see how the optimal targeting threshold changes.")
 
 fig_sim = utils.plot_profit_simulation(ad_cost, conv_value)
-st.plotly_chart(fig_sim, width='stretch')
+st.plotly_chart(fig_sim, use_container_width=True)
 
 # 3. ROI Calculator
 st.markdown('<div class="section-header">3. ROI Calculator</div>', unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns(3)
 
-# Simple calculation based on static uplift assumptions
-# Assuming optimal threshold captures 20% of users with 3x baseline CR
 optimal_users = 10000 * 0.2
 cost = optimal_users * ad_cost
-revenue = optimal_users * (0.002 * 3) * conv_value # 0.6% CR
+revenue = optimal_users * (0.002 * 3) * conv_value
 profit = revenue - cost
 roi = (profit / cost) * 100 if cost > 0 else 0
 
@@ -67,3 +72,8 @@ with col2:
     st.metric("Projected Revenue", f"${revenue:,.2f}")
 with col3:
     st.metric("Projected ROI", f"{roi:.1f}%", delta=roi)
+
+# 4. Strategic Breakeven Analysis
+st.markdown('<div class="section-header">4. Strategic Breakeven Analysis</div>', unsafe_allow_html=True)
+st.markdown("Red zones indicate market conditions where we should pause the campaign. Blue zones are profitable.")
+st.plotly_chart(utils.plot_profit_heatmap(), use_container_width=True)

@@ -259,3 +259,47 @@ def plot_cate_distribution(bins=50):
     # Add vertical line at 0
     fig.add_vline(x=0, line_dash="dash", line_color="white")
     return fig
+
+def plot_profit_heatmap():
+    import numpy as np
+    import plotly.graph_objects as go
+
+    costs = np.linspace(0.01, 0.50, 20)
+    values = np.linspace(1, 20, 20)
+
+    z = []
+    for v in values:
+        row = []
+        for c in costs:
+            # If Cost is low and Value high -> High Profit
+            # Threshold logic: Profit = (Avg_Uplift * Value) - Cost
+            # Avg Uplift for targeted population ~ 6%
+            profit = (0.06 * v) - c
+            row.append(profit)
+        z.append(row)
+
+    fig = go.Figure(
+        data=go.Heatmap(
+            z=z,
+            x=costs,
+            y=values,
+            colorscale='RdBu',
+            zmid=0,
+            colorbar=dict(title='Profit/User')
+        )
+    )
+
+    fig.update_layout(
+        title="Profitability Heatmap (Breakeven Analysis)",
+        xaxis_title="Ad Cost ($)",
+        yaxis_title="Conversion Value ($)",
+        template="plotly_dark",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
+    )
+
+    fig.update_xaxes(showgrid=False)
+    fig.update_yaxes(showgrid=False)
+
+    return fig
+
