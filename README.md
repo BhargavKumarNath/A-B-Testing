@@ -28,74 +28,86 @@ We architected an end-to-end Causal Inference pipeline to transition from descri
 
 The pipeline is designed for **scale (14M+ rows)**, utilizing **Polars** for memory-efficient ingestion and **LightGBM/XGBoost** for gradient-boosted causal estimation.
 
-![System Design](system_design_img.png)
+![System Design](system_design_img.svg)
 
-### 1. Raw Data (The Foundation)
+### The architecture is divided into five critical subsystems: **Ingestion, Integrity, Causal Learning, Economic Policy**, and **Production Serving**.
 
-**Component:** `data/criteo_uplift.parquet`
+## 1. Data Ingestion & Optimization Layer
+**Component:** `DataLoader (Polars)`
 
-- **Implementation:** High-performance, lazy-loaded ingestion of the 14 million row dataset using Polars.
-- **Architectural Significance:** Standard Pandas workflows fail at this scale. Optimized data types (downcast `float64` → `float32`) and leveraged columnar memory mapping. Provides the raw fuel for the engine.
+**Principal Rationale:**  
+At $14$ million rows, standard Pandas workflows hit memory bottlenecks. We utilize **Polars** for its lazy-evaluation capabilities and columnar memory mapping.
 
-### 2. Validation Layer (Sanity & Integrity)
+**Optimization:**  
+The pipeline enforces explicit type downcasting (**Float64 → Float32**) during ingestion. This reduces memory footprint by $~50\%$, allowing us to perform complex causal operations on a single large instance rather than requiring a distributed Spark cluster, reducing infrastructure complexity.
 
-**Component:** `ExperimentValidator`
+## 2. The Integrity Gatekeeper (Validation Layer)
+**Component:** ExperimentValidator
 
-- **Implementation:** Automated statistical checks for **Sample Ratio Mismatch (SRM)** $(p=0.9989)$ and **Covariate Balance** $(SMD < 0.05)$.
-- **Architectural Significance:** Acts as a gatekeeper to ensure the RCT was conducted correctly. Guarantees trust in downstream models.
+**Principal Rationale:**  
+Garbage In, Garbage Out is the primary failure mode in causal inference. Unlike supervised learning, we cannot observe the counterfactual, so we depend fully on the validity of the randomization.
 
-### 3. Strategy (Problem Framing)
+**The Checks:**
 
-**Component:** `Pipeline Orchestrator`
+**SRM (Sample Ratio Mismatch):**  
+A Chi-Square test verifies that the treatment assignment mechanism wasn’t broken.
 
-- **Implementation:** Analytical objective defined as **Prescriptive** (Uplift Modeling) instead of **Descriptive** (Churn/Conversion Prediction).
-- **Architectural Significance:** Shifts focus from correlation to causality: "Who can be persuaded to buy?" instead of "Who will buy?"
+**Covariate Balance (SMD):**  
+Standardized Mean Differences validate that Treatment and Control users are statistically identical before exposure.
 
-### 4. Baseline (The Benchmark)
+**Logic:**  
+If these checks fail, the pipeline executes an ABORT. No modeling is allowed on biased data.
 
-**Component:** `FrequentistEngine`
 
-- **Implementation:** Average Treatment Effect (ATE) with **CUPED** (Controlled-Experiment Using Pre-Experiment Data).
-- **Architectural Significance:** Reduces variance and tightens confidence intervals (~5%), establishing a performance floor for causal ML.
+## 3. Offline Causal Learning (The "Teacher")
+**Component:** `X-Learner (Meta-Learner Architecture)`
 
-### 5. Causal ML (The Brain)
+**Principal Rationale:**  
+We choose an X-Learner instead of T-Learner or S-Learner due to extremely low conversion rates $(<1\%)$ and frequent treatment imbalance in advertising datasets.
 
-**Component:** `XLearner (Meta-Learner)`
+**Mechanism:**
 
-- **Implementation:** X-Learner architecture using Gradient Boosted Trees (LightGBM/XGBoost).
-- **Architectural Significance:** Handles sparse treatment signals in imbalanced datasets (0.3% conversion rate) to estimate Individual Treatment Effect (ITE).
+**Propensity Scoring:**  
+We model $P(T∣X)$ to correct for mild observational biases.
 
-### 6. Off-Policy Evaluation (Risk Management)
+**Outcome Modeling:**  
+Separate gradient-boosted models (LightGBM) are trained for Control $(μ₀)$ and Treatment $(μ₁)$.
 
-**Component:** `UpliftEvaluator` & Bootstrapping
+**Imputation:**  
+We impute individual treatment effects, forming “pseudo-labels” that convert the causal problem into a tractable supervised regression task.
 
-- **Implementation:** Bootstrapped Qini Curves with **95% Confidence Intervals**.
-- **Architectural Significance:** Validates model performance on historical logs before production deployment.
+## 4. Evaluation & Economic Policy
+**Component:** `BanditSimulator & UpliftEvaluator`
 
-### 7. Profit-Aware Bandit (Economic Optimization)
+**Principal Rationale:**  
+Traditional accuracy metrics are insufficient for business decisions. The pipeline optimizes directly for Net Profit.
 
-**Component:** `BanditSimulator` (LinUCB)
+**Cost-Sensitive Learning:**  
+BanditSimulator (LinUCB replay) evaluates historic scenarios by asking whether the conversion value exceeded the ad cost. This reframes the goal from maximizing clicks to maximizing ROI.
 
-- **Implementation:** A Contextual Bandit simulation that optimizes for $Net\ Profit\ =\ (Lift \times Value - Cost)$
-, rather than just focusing on CTR.
+**Uncertainty Quantification:**  
+UpliftEvaluator applies bootstrap resampling to generate $95\%$ confidence intervals for Qini curves, giving stakeholders a view of deployment risk.
 
-- **Architectural Significance:** Converts data science predictions into business value. Reduces bidding volume when ad costs rise.
+## 5. Production Engineering (The "Student")
+**Component:** DistillationEngine
 
-### 8. Knowledge Distillation (Engineering Efficiency)
+**Principal Rationale:**  
+The **X-Learner ensemble** has high inference cost (~100ms), which is incompatible with Real-Time Bidding environments that require responses under $10ms$.
 
-**Component:** `DistillationEngine`
+**Knowledge Distillation:**  
+The **X-Learner** acts as a Teacher. A depth-constrained Decision Tree is trained as a Student to approximate its uplift predictions.
 
-- **Implementation:** Student-Teacher framework. Heavy X-Learner trains a lightweight Decision Tree.
-- **Architectural Significance:** X-Learner inference: ~50ms; Distilled Tree: <1ms. Achieves **104% Profit Retention** and RTB-compatible latency.
+**The Artifact:**  
+The final production asset is `production_uplift_model.pkl` (the Student). This delivers:
 
-### 9. Production Model (The Artifact)
+**Speed:**  
+Sub-millisecond inference time.
 
-**Component:** `production_uplift_model.pkl` & `Live Inference API`
+**Interpretability:**  
+Clear rule-based structure for analysts and stakeholders.
 
-- **Implementation:** Serialized, dependency-light artifact hosted via Streamlit.
-- **Architectural Significance:** Robust, interpretable, profitable, and fast deployable asset.
-
----
+**Regularization:**  
+The simplified model smooths noise while preserving more than 95% of the Teacher’s profit performance, improving stability in production.
 
 # 🔬 Methodology & Technical Deep Dive
 
