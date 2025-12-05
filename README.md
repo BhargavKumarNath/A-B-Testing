@@ -1,109 +1,180 @@
 # Criteo Uplift: Causal AI for Algorithmic Profit Optimization
-![alt text](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)
-![alt text](https://img.shields.io/badge/python-3.10-blue.svg)
-![alt text](https://img.shields.io/badge/Polars-Fast_Data-orange)
-![alt text](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Streamlit Badge](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)
+![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)
+![Polars](https://img.shields.io/badge/Polars-Fast_Data-orange)
+![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)
 📉
 
+---
+
 # 📉 Executive Summary
-**The Problem:** Traditional A/B testing revealed that while board advertising targeting increased conversion rates by $+56\%$, the high cost of media resulted in a **net loss of %0.05 per user**. The campaign was technically effective but economically disastrous.
 
-**The Solution:** We architected an end-to-end Casual Inference pipeline to transition from descriptive analytics ("What happened?") to prescriptive intervention ("Who should we target?"). Using **X-Learner** architectures and **Contextual Bandits**, we isolated the sub-population of "Persuadable" users.
+**The Problem:**  
+Traditional A/B testing revealed that while board advertising targeting increased conversion rates by **+56%**, the high cost of media resulted in a **net loss of 0.05% per user**. The campaign was technically effective but economically disastrous.
 
-The Impact:
-- **Unit Economics:** Turned negative margins into a positive outcome, reaching **0.09 profit per user**, representing a $0.14$ improvement from the previous baseline.
+**The Solution:**  
+We architected an end-to-end Causal Inference pipeline to transition from descriptive analytics ("What happened?") to prescriptive intervention ("Who should we target?"). Using **X-Learner architectures** and **Contextual Bandits**, we isolated the sub-population of "Persuadable" users.
 
-- **Efficiency:** Reduced ad spend volume by $80\%$ while retaining $104\%$ of the net profit.
-
+**The Impact:**
+- **Unit Economics:** Turned negative margins into a positive outcome, reaching **0.09 profit per user**, representing a **$0.14 improvement** from the previous baseline.
+- **Efficiency:** Reduced ad spend volume by **80%** while retaining **104%** of the net profit.
 - **Production:** Distilled heavy meta-learners into a sub-millisecond Decision Tree for real-time bidding (RTB).
 
 [👉 View the Live Command Center](https://ablytics.streamlit.app/)
 
 ---
+
 # 🏗 System Architecture
-The pipeline is designed for scale(14M+ rows), utilising Polars for memory-efficient ingestion and **LightGBM/XGBoost** for gradient-boosted causal estimation.
+
+The pipeline is designed for **scale (14M+ rows)**, utilizing **Polars** for memory-efficient ingestion and **LightGBM/XGBoost** for gradient-boosted causal estimation.
 
 ![System Design](system_design_img.png)
 
+### 1. Raw Data (The Foundation)
+
+**Component:** `data/criteo_uplift.parquet`
+
+- **Implementation:** High-performance, lazy-loaded ingestion of the 14 million row dataset using Polars.
+- **Architectural Significance:** Standard Pandas workflows fail at this scale. Optimized data types (downcast `float64` → `float32`) and leveraged columnar memory mapping. Provides the raw fuel for the engine.
+
+### 2. Validation Layer (Sanity & Integrity)
+
+**Component:** `ExperimentValidator`
+
+- **Implementation:** Automated statistical checks for **Sample Ratio Mismatch (SRM)** $(p=0.9989)$ and **Covariate Balance** $(SMD < 0.05)$.
+- **Architectural Significance:** Acts as a gatekeeper to ensure the RCT was conducted correctly. Guarantees trust in downstream models.
+
+### 3. Strategy (Problem Framing)
+
+**Component:** `Pipeline Orchestrator`
+
+- **Implementation:** Analytical objective defined as **Prescriptive** (Uplift Modeling) instead of **Descriptive** (Churn/Conversion Prediction).
+- **Architectural Significance:** Shifts focus from correlation to causality: "Who can be persuaded to buy?" instead of "Who will buy?"
+
+### 4. Baseline (The Benchmark)
+
+**Component:** `FrequentistEngine`
+
+- **Implementation:** Average Treatment Effect (ATE) with **CUPED** (Controlled-Experiment Using Pre-Experiment Data).
+- **Architectural Significance:** Reduces variance and tightens confidence intervals (~5%), establishing a performance floor for causal ML.
+
+### 5. Causal ML (The Brain)
+
+**Component:** `XLearner (Meta-Learner)`
+
+- **Implementation:** X-Learner architecture using Gradient Boosted Trees (LightGBM/XGBoost).
+- **Architectural Significance:** Handles sparse treatment signals in imbalanced datasets (0.3% conversion rate) to estimate Individual Treatment Effect (ITE).
+
+### 6. Off-Policy Evaluation (Risk Management)
+
+**Component:** `UpliftEvaluator` & Bootstrapping
+
+- **Implementation:** Bootstrapped Qini Curves with **95% Confidence Intervals**.
+- **Architectural Significance:** Validates model performance on historical logs before production deployment.
+
+### 7. Profit-Aware Bandit (Economic Optimization)
+
+**Component:** `BanditSimulator` (LinUCB)
+
+- **Implementation:** A Contextual Bandit simulation that optimizes for $Net\ Profit\ =\ (Lift \times Value - Cost)$
+, rather than just focusing on CTR.
+
+- **Architectural Significance:** Converts data science predictions into business value. Reduces bidding volume when ad costs rise.
+
+### 8. Knowledge Distillation (Engineering Efficiency)
+
+**Component:** `DistillationEngine`
+
+- **Implementation:** Student-Teacher framework. Heavy X-Learner trains a lightweight Decision Tree.
+- **Architectural Significance:** X-Learner inference: ~50ms; Distilled Tree: <1ms. Achieves **104% Profit Retention** and RTB-compatible latency.
+
+### 9. Production Model (The Artifact)
+
+**Component:** `production_uplift_model.pkl` & `Live Inference API`
+
+- **Implementation:** Serialized, dependency-light artifact hosted via Streamlit.
+- **Architectural Significance:** Robust, interpretable, profitable, and fast deployable asset.
+
 ---
+
 # 🔬 Methodology & Technical Deep Dive
-## 1. Experiment Integrity (The Foundation)
-Before modeling, we rigorously validated the RCT (Randomized Controlled Trial) assumptions to ensure downstream causality.
 
-* **Sample Ratio Mismatch (SRM):** Validated traffic split (85/15) with Chi-Square tests (p=0.9989), confirming no assignment bias.
-* **Covariate Balance:** Calculated Standardized Mean Differences (SMD). All 12 features exhibited $SMD < 0.05$, confirming groups were statistically identical pre-treatment.
+### 1. Experiment Integrity (The Foundation)
 
-## 2. Casual Inference (X-Learner)
-We selected the X-Learner over the T-Learner due to the dataset's severe class imbalance (conversions ~$0.3\%$).
+- **Sample Ratio Mismatch (SRM):** Validated traffic split (85/15) using Chi-Square (p=0.9989).  
+- **Covariate Balance:** Standardized Mean Differences (SMD) < 0.05 for all 12 features.
 
-- **Propensity Scoring:** modeing $P(T = 1| X)$ to weight the estimators.
-- **Imputation:** Estimating counterfactuals for Control (What is they were treated?) and Treatment (What if they weren't?)
-- **CATE Estimation:** The final model predicts $\tau(x) = \mathbb{E}[Y \mid X, T = 1] − \mathbb{E}[Y \mid X, T = 0]$.
+### 2. Causal Inference (X-Learner)
 
-## 3. Uncertainty Quantification
-We rejected point estimates in favor of **Bootstrapped Qini Curves**. By resampling the test set 100 times, we generated $95\%$ Confidence Intervals for our uplift curves.
+- **Propensity Scoring:** Model $P(T = 1 | X)$ to weight estimators.  
+- **Imputation:** Estimate counterfactuals for Control and Treatment.  
+- **CATE Estimation:** Predicts `τ(x) = E[Y | X, T = 1] − E[Y | X, T = 0]`
 
-- **Result:** The lower bound of the CI consistently outperformed random targeting, providing statistical guarantees of value to stakeholders.
 
-## 4. Economic Simulation (Contextual Bandits)
-We simulated a LinUCB Bandit using the Replay Method (Off-Policy Evaluation) on logged data.
+### 3. Uncertainty Quantification
 
-- **Logic:** The agent only bids when `Predicted_Uplift * LTV > Cost`.
-- **Sensitivity Analysis:** We stress-tested the policy against rising CPMs. The model demonstrated "Anti-Fragility" automatically retreating to safer, higher-probability segments as costs rose, maintaining positive profitability even at 5x cost.
+- **Bootstrapped Qini Curves:** 100 resamples to generate **95% Confidence Intervals**.  
+- **Result:** Lower CI bound consistently outperforms random targeting.
 
-## 5. Production Engineering (Distillation)
-The X-Learner ensemble (**4+ gradient boosted trees**) is too slow for Real-Time Bidding (RTB) SLAs (**<10ms**).
+### 4. Economic Simulation (Contextual Bandits)
 
--  **Technique:** Knowledge Distillation.
-- **Teacher:** X-Learner.
-- **Student:** Depth-Constrained Decision Tree.
-- **Outcome:** The Student model achieved  **$0.093 profit/user** (vs Teacher's **$0.089**), proving that simpler models acted as effective regularizers against overfitting.
+- **Logic:** Bid only when `Predicted_Uplift * LTV > Cost`.  
+- **Sensitivity Analysis:** Model adapts automatically to rising CPMs, maintaining profitability at 5x cost.
 
-<br>
+### 5. Production Engineering (Distillation)
+
+- **Technique:** Knowledge Distillation.  
+- **Teacher:** X-Learner ensemble (4+ Gradient Boosted Trees)  
+- **Student:** Depth-constrained Decision Tree  
+- **Outcome:** Student achieves **$0.093 profit/user** vs Teacher **$0.089**, proving simpler models act as effective regularizers.
+
+---
 
 # 📊 Key Results
-| **Metric**               | **Fixed A/B Strategy**     | **Causal Bandit Strategy** | **Impact**               |
-|----------------------|----------------------|----------------------|--------------------|
-| **Conversion Rate**       | 0.30%                | 0.65%                | **+116%**              |
-| **Lift**                  | +59.4%               | +350% (Top Decile)   | **6x Precision**       |
-| **Net Profit / User**     | **-$0.05** (Loss)        | **+$0.09** (Profit)      | **Turnaround**         |
-| **Inference Latency**     | N/A                  | < 1ms                | **RTB Ready**          |
 
-<br>
+| Metric                  | Fixed A/B Strategy | Causal Bandit Strategy | Impact            |
+|-------------------------|-----------------|----------------------|-----------------|
+| Conversion Rate          | 0.30%           | 0.65%                | **+116%**       |
+| Lift                     | +59.4%          | +350% (Top Decile)   | **6x Precision**|
+| Net Profit / User        | -$0.05 (Loss)   | +$0.09 (Profit)      | **Turnaround**  |
+| Inference Latency        | N/A             | <1ms                  | **RTB Ready**   |
 
-### **Insight: The "Persuadables"**
-Surrogate modeling revealed that **Feature** `f4` is the primary driver of persuadability.
-- **Strategy:** Users with `f4 < 11.7` and `f3 < 3.0` are "Persuadables".
-- Action: Aggressive bidding on this micro-segment (approx. $15\%$ of population) yields $70\%$
+**Insight: The "Persuadables"**  
+Feature `f4` drives persuadability. Users with `f4 < 11.7` and `f3 < 3.0` (≈15% population) are micro-segmented for aggressive bidding, yielding 70% of lift.
 
 ---
+
 # 💻 Installation & Usage
-## Prerequisites
-- Python 3.9+
-- 16GB RAM recommended for full dataset processing.
 
-## 1. Clone and Install
-<pre>
+### Prerequisites
+
+- Python 3.9+  
+- 16GB RAM recommended for full dataset processing
+
+### Clone and Install
+
+```bash
 git clone https://github.com/BhargavKumarNath/A-B-Testing.git
-
 cd A-B-Testing
-
 pip install -r requirements.txt
-</pre>
-
-## 2. Run the End-to-End Pipeline
-
+```
+### Run the End-to-End Pipeline
 This script handles ingestion, validation, training, simulation, and distillation.
 
-<pre>python main.py</pre>
-Artifacts will be saved to `results/` (Models, Plots,CSVs).
+```bash
+python main.py
+```
+Artifacts will be saved to results/ (Models, Plots, CSVs).
 
-## 3. Launch the Dashboard
-Access the interactive command center locally
+### Launch the Dashboard
+Access the interactive command center locally.
 
-<pre> streamlit run dashboard/app.py</pre>
+```bash
+streamlit run app.py
+```
 
-<pre>
+# 📂 Project Structure
+```bash
 ├── data/                   # Raw Parquet files (gitignored)
 ├── results/                # Generated artifacts (Plots, Models)
 ├── src/
@@ -122,11 +193,12 @@ Access the interactive command center locally
 │   └── utils/
 │       └── plotting.py       # Plotly Visualization Suite
 ├── app.py                  # Streamlit Dashboard Entry Point
-├── tests/                  # Unit and Integration Tests for statistical checks
+├── tests/                  # Unit & Integration Tests for statistical checks
 └── README.md               # Documentation
-</pre>
 
-## 🛡 License & Acknowledgements
-Dataset: Criteo Uplift Modeling Dataset.
-License: MIT License.
-Authorship: Designed and implemented by Bhargav Kumar Nath, Pipeline Architect.
+```
+
+# 🛡 License & Acknowledgements
+* **Dataset:** Criteo Uplift Modeling Dataset.
+* **License:** MIT License.
+* **Authorship:** Designed and implemented by Bhargav Kumar Nath.
