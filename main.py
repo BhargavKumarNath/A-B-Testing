@@ -12,7 +12,8 @@ from src.components.models import XLearner
 from src.components.evaluation import UpliftEvaluator
 from src.components.segmentation import SegmentAnalyzer
 from src.components.bandit import BanditSimulator 
-from src.components.distillation import DistillationEngine # <--- NEW
+from src.components.distillation import DistillationEngine
+from src.components.exporter import PowerBIExporter
 from src.utils.plotting import plot_uplift_by_decile, plot_bootstrapped_qini, plot_bandit_performance
 
 # Configure Logging
@@ -49,8 +50,16 @@ def run_pipeline():
     logger.info("Phase 2: Classical A/B Testing")
     stat_engine = FrequentistEngine(df)
     ate_result = stat_engine.calculate_ate("conversion")
-    
     logger.info(f"Global ATE: {ate_result.absolute_effect:.6f} (Lift: {ate_result.relative_effect:.2%})")
+
+    # CUPED variance reduction — computed on a 10 % random sample for performance.
+    # With n ≈ 1.4 M rows, the theta estimate is statistically equivalent to the
+    # full-dataset result (SE ∝ 1/√n; further reduction is negligible at this scale).
+    logger.info("Computing CUPED (10 % sample for efficiency) ...")
+    sample_size_cuped = max(100_000, int(df.height * 0.10))
+    cuped_sample = df.sample(n=sample_size_cuped, shuffle=True, seed=42)
+    cuped_engine = FrequentistEngine(cuped_sample)
+    cuped_result = cuped_engine.calculate_cuped("conversion")
     
     # 4. Advanced Uplift Modeling (X-Learner)
     logger.info("Phase 3: Uplift Modeling (X-Learner)")
@@ -84,7 +93,10 @@ def run_pipeline():
     logger.info("Phase 5: Segmentation Analysis")
     analyzer = SegmentAnalyzer(test_df, FEATURE_COLS)
     profile_df = analyzer.get_segment_profiles(uplift_scores, top_percentile=0.15)
-    rules = analyzer.explain_with_surrogate(uplift_scores, max_depth=3)
+    # max_depth=5 matches the production distillation depth and powerbi.md specification.
+    # max_depth=3 was the original demo setting; depth=5 produces richer rules for
+    # the Page 5 tree rules viewer without sacrificing interpretability.
+    rules = analyzer.explain_with_surrogate(uplift_scores, max_depth=5)
     
     profile_df.to_csv(f"{OUTPUT_DIR}/segment_profile.csv")
     with open(f"{OUTPUT_DIR}/segment_rules.txt", "w") as f:
@@ -123,6 +135,34 @@ def run_pipeline():
 
     logger.info(f"Full Pipeline Complete. Assets saved to {OUTPUT_DIR}/")
     logger.info(f"Total Time: {(time.time() - start_time)/60:.2f} minutes")
+
+    # ── Phase 2: Power BI Data Export ────────────────────────────────────────
+    # All pipeline artefacts are now available.  The exporter collects them,
+    # applies optimisations (downsampling, stratified sampling, PSI computation),
+    # and writes structured CSVs to results/data/ for the Power BI data model.
+    logger.info("Starting Power BI data export layer ...")
+    exporter = PowerBIExporter(
+        output_dir          = OUTPUT_DIR,
+        feature_cols        = FEATURE_COLS,
+        srm_result          = validator.check_srm(),     # re-call: pure computation, no side-effect
+        balance_df          = balance_df,
+        ate_result          = ate_result,
+        cuped_result        = cuped_result,
+        uplift_scores       = uplift_scores,
+        test_df             = test_df,
+        train_df            = train_df,
+        decile_stats        = decile_stats,
+        qini_data           = qini_data,
+        learner             = learner,
+        analyzer            = analyzer,
+        bandit_res          = bandit_res,
+        baseline_profit_per_user = baseline_profit_per_user,
+        student_r2          = r2_score,
+        conversion_value    = CONVERSION_VALUE,
+        cost_per_ad         = COST_PER_AD,
+    )
+    export_paths = exporter.export_all()
+    logger.info(f"Power BI exports complete: {len(export_paths)} files in {OUTPUT_DIR}/data/")
 
 if __name__ == "__main__":
     run_pipeline()

@@ -66,7 +66,7 @@ The end-to-end workflow is composed of five specialized subsystems:
 ![Alt text](system_design.svg)
 ---
 
-## 🧠 Advanced Machine Learning Methodologies
+## Advanced Machine Learning Methodologies
 
 This repository goes far beyond standard predictive modeling. It implements a rigorous, industry-grade causal architecture designed to guarantee statistical validity, reduce latency, and maximize true economic value.
 
@@ -88,7 +88,7 @@ Bridged the gap between heavy causal modeling and Real-Time Bidding (RTB) latenc
 
 ---
 
-## 📊 Key Results
+## Key Results
 
 | Metric                  | Fixed A/B Strategy | Causal Bandit Strategy | Impact            |
 |-------------------------|-----------------|----------------------|-----------------|
@@ -102,7 +102,7 @@ Users with high `f4 (> 11.7)` and low `f3` are micro-segmented for aggressive bi
 
 ---
 
-## 💻 Installation & Usage
+## Installation & Usage
 
 ### Prerequisites
 - Python 3.9+  
@@ -130,7 +130,7 @@ streamlit run app.py
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
 A-B-Testing/
@@ -157,6 +157,28 @@ A-B-Testing/
 
 ---
 
+
+
+## Power BI Dashboard
+In addition to the Python pipeline, this project includes a **Power BI Dashboard** for executive reporting and interactive model analysis. 
+
+![Power BI Dashboard](docs/dashboard_snap/page_1.jpg)
+
+The dashboard is engineered using a highly optimized, flat-table architecture designed to handle millions of rows with sub-second cross-filtering. 
+
+**Key Features:**
+- **Executive Performance:** High-level P&L tracking comparing Bandit vs. A/B testing strategies.
+- **Audience Intelligence:** Deep-dive into Uplift Archetypes (Lost Causes, Persuadables, Sure Things, Sleeping Dogs) with dynamic User Profile tooltips.
+- **Budget Optimisation:** Interactive What-If parameters to dynamically recalculate ROI based on custom budgets, CAC, and LTV.
+- **Experiment Governance:** Automated SRM (Sample Ratio Mismatch) and Covariate Balance auditing.
+- **Model Intelligence:** Qini curve performance tracking and granular Tree Rule path analysis.
+
+**Documentation & Assets:**
+- **Dashboard File:** `results/powerbi/criteo_uplift_analytics.pbix`
+- **Full PDF Report:** [docs/dashboard_snap/criteo_uplift_analytics.pdf](docs/dashboard_snap/criteo_uplift_analytics.pdf)
+- **Implementation Guide:** [docs/powerbi.md](docs/powerbi.md)
+
+---
 ## 🛡 License & Acknowledgements
 - **Dataset:** Based on the Criteo Uplift Modeling Dataset.
 - **License:** MIT License.
