@@ -92,7 +92,7 @@ Bridged the gap between heavy causal modeling and Real-Time Bidding (RTB) latenc
 
 | Metric                  | Fixed A/B Strategy | Causal Bandit Strategy | Impact            |
 |-------------------------|-----------------|----------------------|-----------------|
-| Conversion Rate          | 0.30%           | 0.65%                | **+116%**       |
+| Conversion Rate          | 0.31%           | 1.90%                | **+512%**       |
 | Lift                     | +59.4%          | +350% (Top Decile)   | **6x Precision**|
 | Net Profit / User        | -$0.05 (Loss)   | +$0.09 (Profit)      | **Turnaround**  |
 | Inference Latency        | N/A             | < 1ms                  | **RTB Ready**   |
