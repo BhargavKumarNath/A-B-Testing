@@ -320,7 +320,7 @@ Absolute improvement: **+$0.14 per user**
 
 | Metric | A/B Test | Causal Bandit | Impact |
 |--------|----------|--------------|--------|
-| Conversion Rate (targeted) | 0.30% (broad) | 0.65% (top decile) | +116% |
+| Conversion Rate (targeted) | 0.31% (broad) | 1.90% (targeted) | +512% |
 | Relative Lift | +59.45% | +350% (top decile) | 6× precision |
 | Inference Latency | N/A | **~45 µs** | RTB-ready |
 | SRM p-value | 0.9989 | — | Valid experiment |
