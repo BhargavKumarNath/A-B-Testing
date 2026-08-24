@@ -84,7 +84,8 @@ export default function InferenceEngine() {
     setError(null);
     setResult(null); // clear previous result so UI shows loading state clearly
     try {
-      const res = await axios.post('http://localhost:8080/predict', features, { timeout: 5000 });
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://a-b-testing-569o.onrender.com';
+      const res = await axios.post(`${apiUrl}/predict`, features, { timeout: 15000 });
       const entry = {
         ...res.data,
         timestamp: new Date().toLocaleTimeString(),
@@ -94,7 +95,7 @@ export default function InferenceEngine() {
       setHistory(h => [entry, ...h].slice(0, 6));
       setDirty(false);
     } catch (err) {
-      setError(err.response?.data?.detail ?? 'Could not connect to the inference API on port 8080.');
+      setError(err.response?.data?.detail ?? 'Could not connect to the inference API. Please ensure the backend service is running.');
     } finally {
       setLoading(false);
     }
