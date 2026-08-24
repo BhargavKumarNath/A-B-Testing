@@ -52,7 +52,7 @@ def run_pipeline():
     ate_result = stat_engine.calculate_ate("conversion")
     logger.info(f"Global ATE: {ate_result.absolute_effect:.6f} (Lift: {ate_result.relative_effect:.2%})")
 
-    # CUPED variance reduction — computed on a 10 % random sample for performance.
+    # CUPED variance reduction - computed on a 10 % random sample for performance.
     # With n ≈ 1.4 M rows, the theta estimate is statistically equivalent to the
     # full-dataset result (SE ∝ 1/√n; further reduction is negligible at this scale).
     logger.info("Computing CUPED (10 % sample for efficiency) ...")
@@ -113,10 +113,10 @@ def run_pipeline():
         cost_per_ad=COST_PER_AD
     )
     
-    # Calculate Baseline Profit (Fixed Strategy)
-    # If we treat everyone: Profit = (GlobalCTR * Value) - Cost
-    global_ctr = df["conversion"].mean()
-    baseline_profit_per_user = (global_ctr * CONVERSION_VALUE) - (COST_PER_AD * df["treatment"].mean())
+    # Calculate Baseline Profit (Fixed Strategy: Treat Everyone)
+    # If we treat everyone: Profit = (TreatmentCTR * Value) - Cost
+    treatment_ctr = df.filter(pl.col("treatment") == 1)["conversion"].mean()
+    baseline_profit_per_user = (treatment_ctr * CONVERSION_VALUE) - COST_PER_AD
     
     logger.info("=== Economic Impact ===")
     logger.info(f"Fixed Strategy Profit/User: ${baseline_profit_per_user:.4f}")
@@ -163,6 +163,27 @@ def run_pipeline():
     )
     export_paths = exporter.export_all()
     logger.info(f"Power BI exports complete: {len(export_paths)} files in {OUTPUT_DIR}/data/")
+    
+    import json
+    logger.info("Generating insights.json for Frontend...")
+    insights = {
+        "metrics": {
+            "baseline_profit_per_user": baseline_profit_per_user,
+            "bandit_profit_per_user": bandit_res['avg_profit'],
+            "global_ate_absolute": ate_result.absolute_effect,
+            "global_ate_relative": ate_result.relative_effect,
+            "student_r2": r2_score
+        },
+        "decile_stats": decile_stats.to_pandas().to_dict(orient="records"),
+        "qini_data": {k: (v.tolist() if isinstance(v, np.ndarray) else v) for k, v in qini_data.items()},
+        "rules": rules
+    }
+    
+    frontend_dir = Path("frontend/public")
+    frontend_dir.mkdir(parents=True, exist_ok=True)
+    with open(frontend_dir / "insights.json", "w") as f:
+        json.dump(insights, f, indent=2)
+    logger.info("Insights saved to frontend/public/insights.json")
 
 if __name__ == "__main__":
     run_pipeline()

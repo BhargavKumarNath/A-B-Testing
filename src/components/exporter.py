@@ -54,9 +54,9 @@ logger = logging.getLogger(__name__)
 PERSUADABLE_UPLIFT_THRESHOLD = 0.02
 
 # PSI thresholds (industry standard, e.g. OCC 2011 guidance)
-PSI_GREEN_THRESHOLD  = 0.10   # Stable — no action
-PSI_AMBER_THRESHOLD  = 0.25   # Moderate drift — monitor
-# > 0.25 = Significant drift — retrain
+PSI_GREEN_THRESHOLD  = 0.10   # Stable - no action
+PSI_AMBER_THRESHOLD  = 0.25   # Moderate drift - monitor
+# > 0.25 = Significant drift - retrain
 
 # Bandit trajectory downsample target
 TRAJECTORY_SAMPLE_POINTS = 2_000
@@ -64,7 +64,7 @@ TRAJECTORY_SAMPLE_POINTS = 2_000
 # Uplift scatter plot sample size (stratified across archetypes)
 UPLIFT_SAMPLE_SIZE = 50_000
 
-# Qini curve points (already 1 000 from evaluator — keep as-is)
+# Qini curve points (already 1 000 from evaluator - keep as-is)
 # Monitoring simulation weeks
 MONITORING_WEEKS = 8
 
@@ -94,7 +94,7 @@ class PowerBIExporter:
     test_df : pl.DataFrame
         Held-out test split (20 % of data).
     train_df : pl.DataFrame
-        Training split (80 % of data) — used as PSI reference distribution.
+        Training split (80 % of data) - used as PSI reference distribution.
     decile_stats : pl.DataFrame
         Output of ``UpliftEvaluator.get_decile_stats()``.
     qini_data : dict
@@ -187,7 +187,7 @@ class PowerBIExporter:
         """
         if self._baseline_probs is None:
             logger.info("Computing baseline conversion probabilities (m0.predict) ...")
-            # learner.m0 is a LightGBM Booster — its predict() accepts numpy arrays directly.
+            # learner.m0 is a LightGBM Booster - its predict() accepts numpy arrays directly.
             X_test = self.test_df.select(self.feature_cols).to_numpy()
             self._baseline_probs = self.learner.m0.predict(X_test)  # returns float64 ndarray
         return self._baseline_probs
@@ -251,7 +251,7 @@ class PowerBIExporter:
         Industry thresholds:
           < 0.10  → stable (GREEN)
           0.10–0.25 → moderate drift (AMBER)
-          > 0.25  → significant drift — retrain (RED)
+          > 0.25  → significant drift - retrain (RED)
 
         Uses a small epsilon to prevent log(0).  Bins are defined on the
         reference distribution and applied identically to the current period.
@@ -369,7 +369,7 @@ class PowerBIExporter:
         Downsampled cumulative-profit trajectory for the Page 1 trend chart.
 
         Optimisation: The raw history_reward from BanditSimulator can contain
-        up to 1 000 000 data points — one per aligned impression.  For a trend
+        up to 1 000 000 data points - one per aligned impression.  For a trend
         line in Power BI, 2 000 evenly-spaced points are visually identical.
         Downsampling reduces the CSV from ~40 MB to ~80 KB (500× reduction)
         and eliminates the single largest cardinality source in the data model.
@@ -401,7 +401,7 @@ class PowerBIExporter:
         df.to_csv(path, index=False)
         logger.info(
             f"  → {path.name}: {len(df):,} rows "
-            f"(downsampled from {total_pts:,} — {100*len(df)/total_pts:.1f}% retained)"
+            f"(downsampled from {total_pts:,} - {100*len(df)/total_pts:.1f}% retained)"
         )
         return path
 
@@ -415,7 +415,7 @@ class PowerBIExporter:
         Stratification rationale: A purely random sample risks dropping rare
         archetypes entirely.  With a Sleeping Dog population of ~3–5 %, a
         50 000 random sample would yield only ~1 500–2 500 Sleeping Dog points
-        — barely visible on a scatter.  Stratified sampling guarantees
+        - barely visible on a scatter.  Stratified sampling guarantees
         proportional representation of all four archetypes.
 
         Archetype labels are pre-computed in Python (not as DAX calculated
@@ -495,7 +495,7 @@ class PowerBIExporter:
         converted to integers and re-keyed so decile 10 = highest predicted
         uplift (consistent with the Power BI visual labelling).
 
-        Optimisation: null handling — if a decile has no control or no
+        Optimisation: null handling - if a decile has no control or no
         treatment observations, mean_y_c / mean_y_t will be null.  These are
         filled with 0 to prevent Power BI from dropping entire visual rows.
         """
@@ -601,7 +601,7 @@ class PowerBIExporter:
         """
         Pre-aggregated Qini curve data (1 000 points) for the Page 5 chart.
 
-        The Qini curve is NOT recomputed by DAX — it is the direct output of
+        The Qini curve is NOT recomputed by DAX - it is the direct output of
         the bootstrapped evaluation in Python and is imported as static data.
         Power BI renders it as a line chart + filled area (95 % CI band).
 
@@ -622,7 +622,7 @@ class PowerBIExporter:
             "auuc_std"        : round(self.qini_data["auuc_std"],    4),
         })
 
-        # auuc_mean and auuc_std are scalar — broadcast to all rows so DAX
+        # auuc_mean and auuc_std are scalar - broadcast to all rows so DAX
         # can retrieve them from a MAX() without a separate lookup table.
         df.to_csv(path, index=False)
         logger.info(f"  → {path.name}: {len(df):,} rows")
@@ -641,14 +641,14 @@ class PowerBIExporter:
         corresponds to the surrogate model's primary boundary for that feature.
 
         Optimisation: this data is merged with segment_profile.csv in Power BI
-        to form DimSegmentProfile — there is no need for a separate join step
+        to form DimSegmentProfile - there is no need for a separate join step
         because both tables have 12 rows keyed on feature name.
         """
         path = self.output_dir / "feature_importance.csv"
         logger.info("Exporting feature_importance.csv ...")
 
         if not hasattr(self.analyzer, "tree_model"):
-            logger.warning("  ⚠ analyzer.tree_model not found — run explain_with_surrogate() first")
+            logger.warning("  ⚠ analyzer.tree_model not found - run explain_with_surrogate() first")
             return path
 
         tree     = self.analyzer.tree_model
@@ -735,7 +735,7 @@ class PowerBIExporter:
         - LinUCB Bandit: live from bandit_res['avg_profit']
 
         The Uplift Greedy value remains hardcoded because this project does
-        not implement a separate greedy simulation — it would require replaying
+        not implement a separate greedy simulation - it would require replaying
         the dataset with a fixed top-k% targeting rule.  This is documented as
         a known approximation.
         """
@@ -867,7 +867,7 @@ class PowerBIExporter:
         logger.info("Exporting tree_rules.csv ...")
 
         if not hasattr(self.analyzer, "tree_model"):
-            logger.warning("  ⚠ analyzer.tree_model not found — skipping tree_rules.csv")
+            logger.warning("  ⚠ analyzer.tree_model not found - skipping tree_rules.csv")
             return path
 
         tree_  = self.analyzer.tree_model.tree_
@@ -882,8 +882,8 @@ class PowerBIExporter:
 
             is_leaf = (feat_idx == _tree.TREE_UNDEFINED)
             node_type = "Leaf" if is_leaf else "Split"
-            feature_name = feats[feat_idx] if not is_leaf else "—"
-            threshold_str = f"{threshold:.4f}" if not is_leaf else "—"
+            feature_name = feats[feat_idx] if not is_leaf else "-"
+            threshold_str = f"{threshold:.4f}" if not is_leaf else "-"
 
             rows.append({
                 "node_id"         : node_id,
@@ -924,7 +924,7 @@ class PowerBIExporter:
         - Decision Tree: sklearn tree traversal ≈ 45µs = 0.045ms
 
         The latency_ms column uses log scale in the visual (120ms vs 0.045ms
-        = 2667× difference — a linear scale makes the student invisible).
+        = 2667× difference - a linear scale makes the student invisible).
 
         Optimisation note: This table intentionally omits per-depth benchmarks
         (depths 2–6) because retraining at each depth during the main pipeline
@@ -1093,7 +1093,7 @@ class PowerBIExporter:
         Lightweight schema validation: verify every expected file exists,
         is non-empty, and contains the minimum expected number of rows.
 
-        Minimum row counts are conservative — failure indicates a pipeline
+        Minimum row counts are conservative - failure indicates a pipeline
         bug rather than an edge case.
         """
         min_rows = {
@@ -1171,7 +1171,7 @@ class PowerBIExporter:
                 path = fn()
                 export_paths[filename] = path
             except Exception as e:
-                logger.error(f"  ✗ Export failed: {filename} — {e}", exc_info=True)
+                logger.error(f"  ✗ Export failed: {filename} - {e}", exc_info=True)
                 failed.append(filename)
 
         # Monitoring simulation produces three files
@@ -1208,7 +1208,7 @@ class PowerBIExporter:
         if is_valid:
             logger.info("✓ All schema checks passed.")
         else:
-            logger.warning("⚠ Schema validation found issues — review logs above.")
+            logger.warning("⚠ Schema validation found issues - review logs above.")
 
         logger.info(f"Manifest written to: {manifest_path}")
         logger.info("=" * 60)

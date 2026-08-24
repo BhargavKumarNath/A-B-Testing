@@ -102,8 +102,13 @@ class BanditSimulator:
             
             # 2. Replay Logic (Match?)
             if chosen_arm == actual_treatment:
-                # Update Agent with the PROFIT, not just conversion
-                agent.update(chosen_arm, x_context, realized_profit)
+                # Scale reward to [0, 1] for stable LinUCB convergence
+                min_profit = -cost_per_ad
+                max_profit = conversion_value
+                scaled_reward = (realized_profit - min_profit) / (max_profit - min_profit)
+                
+                # Update Agent with the scaled PROFIT
+                agent.update(chosen_arm, x_context, scaled_reward)
                 
                 cumulative_profit += realized_profit
                 aligned_counts += 1

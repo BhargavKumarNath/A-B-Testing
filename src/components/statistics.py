@@ -117,11 +117,14 @@ class FrequentistEngine:
             X_centered = X - X_mean
             
             # Estimate Theta (Beta) using OLS: (X'X)^-1 X'Y
-            # Using simple Covariance/Variance ratio for multivariate:
-            # Theta = Cov(Y, X) * Var(X)^-1
+            # Calculate theta strictly on the Control group to prevent treatment effect leakage
+            control_df = self.df.filter(pl.col(self.treatment_col) == 0)
+            X_control = control_df.select(covariates).to_numpy()
+            Y_control = control_df.select(target_col).to_numpy()
+            X_control_centered = X_control - X_mean
             
             # Using numpy least squares is safer and handles multivariate
-            theta, _, _, _ = np.linalg.lstsq(X_centered, Y, rcond=None)
+            theta, _, _, _ = np.linalg.lstsq(X_control_centered, Y_control, rcond=None)
             
             # Calculate CUPED Metric
             # Y_adj = Y - (X - X_mean) * theta
