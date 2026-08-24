@@ -33,7 +33,7 @@ The end-to-end workflow is decoupled into three core domains: the offline pipeli
 
 ```mermaid
 graph TD
-    subgraph Offline Pipeline (pipeline.py)
+    subgraph OfflinePipeline [Offline Pipeline]
         A[criteo_uplift.parquet] --> B(DataLoader: Polars)
         B --> C(ExperimentValidator: SRM/SMD)
         C --> D(X-Learner: LightGBM)
@@ -46,13 +46,13 @@ graph TD
         H --> I[(insights.json)]
     end
 
-    subgraph Backend API (FastAPI)
+    subgraph BackendAPI [Backend API]
         G --> J[FastAPI Server]
         J --> K{Predict Endpoint}
         K -- CATE * LTV > Cost --> L[BID Verdict]
     end
 
-    subgraph Frontend Dashboard (React + Vite)
+    subgraph FrontendDashboard [Frontend Dashboard]
         I --> M[Executive Summary]
         I --> N[Causal Analysis]
         I --> O[Bandit Simulation]
