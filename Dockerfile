@@ -1,9 +1,8 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt fastapi uvicorn pydantic scikit-learn numpy
+RUN pip install --no-cache-dir fastapi uvicorn pydantic scikit-learn numpy
 
 COPY api/ ./api/
 COPY results/production_uplift_model.pkl ./results/
