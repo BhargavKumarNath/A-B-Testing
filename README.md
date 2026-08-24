@@ -1,10 +1,15 @@
 # Criteo Uplift: Causal AI for Algorithmic Profit Optimization
 
-![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
-![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)
+[![Live Demo](https://img.shields.io/badge/Demo-Live_Dashboard-8B5CF6?style=for-the-badge&logo=vercel&logoColor=white)](https://frontend-blond-zeta-3p7cbxlssm.vercel.app/)
+[![API Status](https://img.shields.io/badge/API-Render_Live-10B981?style=for-the-badge&logo=render&logoColor=white)](https://a-b-testing-569o.onrender.com/health)
+
+![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)
 ![Polars](https://img.shields.io/badge/Polars-Fast_Data-orange)
 ![LightGBM](https://img.shields.io/badge/LightGBM-Gradient_Boosting-green)
 ![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)
+
+> **Live Dashboard URL:** [https://frontend-blond-zeta-3p7cbxlssm.vercel.app/](https://frontend-blond-zeta-3p7cbxlssm.vercel.app/)  
+> **Production API (Render):** [https://a-b-testing-569o.onrender.com](https://a-b-testing-569o.onrender.com)
 
 ---
 
