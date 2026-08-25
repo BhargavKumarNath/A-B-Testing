@@ -32,12 +32,12 @@ class UpliftEvaluator:
         )
 
         stats = eval_df.group_by("bin").agg([
-            pl.count().alias("n_obs"),
+            pl.len().alias("n_obs"),
             pl.col("pred_uplift").mean().alias("mean_pred_uplift"),
             pl.col(self.target_col).filter(pl.col(self.treatment_col) == 0).mean().alias("mean_y_c"),
-            pl.col(self.target_col).filter(pl.col(self.treatment_col) == 0).count().alias("n_c"),
+            pl.col(self.target_col).filter(pl.col(self.treatment_col) == 0).len().alias("n_c"),
             pl.col(self.target_col).filter(pl.col(self.treatment_col) == 1).mean().alias("mean_y_t"),
-            pl.col(self.target_col).filter(pl.col(self.treatment_col) == 1).count().alias("n_t"),
+            pl.col(self.target_col).filter(pl.col(self.treatment_col) == 1).len().alias("n_t"),
         ]).sort("bin", descending=True)
 
         stats = stats.with_columns(
@@ -72,7 +72,7 @@ class UpliftEvaluator:
         curve_x = np.linspace(0, 1, len(curve_y))
         
         # Area Under Curve (Trapezoidal)
-        auuc = np.trapz(curve_y, curve_x)
+        auuc = np.trapezoid(curve_y, curve_x)
         
         return curve_x, curve_y, auuc
 

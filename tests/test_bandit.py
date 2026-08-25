@@ -43,8 +43,8 @@ def test_replay_simulation():
     result = sim.run_replay(sample_size=50)
     
     assert result['aligned_events'] > 0
-    assert "ctr" in result
-    print(f"Simulation CTR: {result['ctr']:.2%}")
+    assert "avg_profit" in result
+    print(f"Simulation Avg Profit: ${result['avg_profit']:.4f}")
 
 if __name__ == "__main__":
     test_linucb_learning()

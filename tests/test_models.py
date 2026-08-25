@@ -15,6 +15,7 @@ def test_tlearner_heterogeneity():
     - If f0 > 0: Treatment adds +0.5 to conversion prob.
     - If f0 <= 0: Treatment has NO effect (0.0).
     """
+    np.random.seed(42)
     n = 5000
     
     # 1. Generate Synthetic Data
