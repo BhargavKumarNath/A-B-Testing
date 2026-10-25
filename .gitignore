@@ -36,3 +36,5 @@ yarn-error.log*
 Thumbs.db
 .vscode/
 .idea/
+CLAUDE.md
+.gitignore
