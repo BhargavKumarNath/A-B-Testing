@@ -14,13 +14,13 @@
 ## Executive Summary
 
 **The Business Problem:**  
-Traditional A/B testing on advertising campaigns showed that broad targeting increased conversion rates by +59.4%. However, the high cost of media resulted in a net loss of $0.05 per user. The campaign was statistically effective but economically unprofitable.
+Traditional A/B testing on advertising campaigns showed that broad targeting increased conversion rates by +59.4%. However, the high cost of media resulted in a net loss of $0.07 per user. The campaign was statistically effective but economically unprofitable.
 
 **The Solution:**  
 We built an end-to-end machine learning pipeline to transition from descriptive analytics ("What happened?") to prescriptive intervention ("Who should we target?"). Using advanced modeling techniques and Contextual Bandits, we successfully isolated the sub-population of "Persuadable" users.
 
 **The Impact:**
-* **Profitability:** Turned negative margins into a positive outcome, achieving $0.09 profit per user (a $0.14 improvement over the baseline strategy).
+* **Profitability:** Turned negative margins into a positive outcome: the profit-aware bandit earns +$0.072 per user (95% CI +$0.068 to +$0.076) against -$0.069 for showing everyone the ad, and against +$0.019 for showing no one the ad. See [Results and their uncertainty](#results-and-their-uncertainty).
 * **Efficiency:** Drastically reduced ad spend volume while capturing the true value of the campaign.
 * **Production Readiness:** Compressed complex models into a high-speed Decision Tree for Real-Time Bidding (RTB).
 
@@ -32,7 +32,7 @@ The workflow is divided into three main areas: the offline data pipeline, the ba
 
 ### 1. Data Ingestion
 * **Role:** Efficiently loads massive datasets (over 14 million rows) while preventing memory errors.
-* **Technology:** Utilizes Polars for fast data processing and memory optimization, reducing the memory footprint by approximately 50%.
+* **Technology:** Utilizes Polars for fast data processing and memory optimization, reducing the memory footprint by 59.4% (1,706 MB to 693 MB).
 
 ### 2. Data Integrity
 * **Role:** Programmatically guarantees the statistical soundness of the randomized control trial before any modeling occurs.
@@ -56,11 +56,25 @@ The workflow is divided into three main areas: the offline data pipeline, the ba
 | :--- | :--- | :--- | :--- |
 | Conversion Rate | 0.31% | 1.90% | **+512%** |
 | Lift | +59.4% | +350% | **6x Precision** |
-| Net Profit per User | -$0.05 (Loss) | +$0.09 (Profit) | **Turnaround** |
+| Net Profit per User | -$0.069 (Loss) | +$0.072 (Profit) | **Turnaround** |
 | Inference Latency | N/A | < 1ms | **Ready for Live Bidding** |
 
 **Key Insight:**  
 Users with high `f4` scores and low `f3` scores are micro-segmented for aggressive bidding. This small population yields the vast majority of the profit.
+
+## Results and their uncertainty
+
+Every random draw in `pipeline.py` (train/test split, Qini bootstrap, profit bootstrap, bandit stream, distilled and surrogate trees, exporter samples) uses one seed, `SEED = 42`, fixed before any seeded run was looked at. Earlier versions left the 80/20 split unseeded, so the notebook, `insights.json` and this README each reported a different run. Re-running the pipeline now reproduces the same headline numbers, and the executed notebook uses the same split and matches them.
+
+Profit per user at $10 per conversion and $0.10 per ad, with 95% bootstrap intervals (10,000 resamples):
+
+| Policy | Profit per user | 95% CI | Rows |
+| :--- | :--- | :--- | :--- |
+| Show everyone the ad | -$0.0691 | -$0.0694 to -$0.0688 | 11,882,655 treated users |
+| Show no one the ad | +$0.0194 | +$0.0188 to +$0.0200 | 2,096,937 control users |
+| Profit-aware LinUCB bandit (replay) | **+$0.0720** | +$0.0676 to +$0.0763 | 172,290 matched of 1,000,000 replayed |
+
+The bandit beats both fixed policies with intervals that do not overlap. The interval covers sampling noise in the evaluation rows only; it does not cover what a different replay order would do to the bandit's learning. Numbers are written to `frontend/public/insights.json` (`profit_ci_95`) and `results/reports/run_metrics.json` on every run.
 
 ## Setup and Installation
 
@@ -75,20 +89,30 @@ cd A-B-Testing
 pip install -r requirements.txt
 ```
 
-### 2. Run the Offline Pipeline
+### 2. Get the data
+The pipeline reads the public [Criteo Uplift Prediction Dataset v2.1](https://huggingface.co/datasets/criteo/criteo-uplift) (13,979,592 rows, 16 columns, CC BY-NC-SA 4.0), published by Criteo AI Lab on its Hugging Face account. Convert it to Parquet once:
+```bash
+mkdir -p data
+curl -L -o data/criteo-research-uplift-v2.1.csv.gz \
+  https://huggingface.co/datasets/criteo/criteo-uplift/resolve/main/criteo-research-uplift-v2.1.csv.gz
+# sha256 2716e1bf0fd157a93b5bf86924d9088419dfbac2022c6cd90030220634f616dc
+python -c "import polars as pl; pl.read_csv('data/criteo-research-uplift-v2.1.csv.gz').write_parquet('data/criteo_uplift.parquet')"
+```
+
+### 3. Run the Offline Pipeline
 This script handles data loading, statistical validation, model training, and simulation. It will generate the final models and insights.
 ```bash
 python pipeline.py
 ```
 
-### 3. Start the Backend API
+### 4. Start the Backend API
 The FastAPI server hosts the optimized model for real-time decisions.
 ```bash
 uvicorn api.main:app --port 8080
 ```
 The API will be available at `http://127.0.0.1:8080/predict`.
 
-### 4. Launch the Frontend Dashboard
+### 5. Launch the Frontend Dashboard
 Open a new terminal, navigate to the frontend folder, install dependencies, and start the development server.
 ```bash
 cd frontend

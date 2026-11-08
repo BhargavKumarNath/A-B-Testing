@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Zap, AlertTriangle, CheckCircle, XCircle, Send, TrendingUp, ArrowRight, HelpCircle, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
 import { FadeIn } from '../components/Animations';
@@ -41,6 +41,12 @@ const PIPELINE_STEPS = [
   { box: 'cyan',    icon: '💰', name: 'Bid Policy',   sub: 'LTV x CATE > Cost' },
 ];
 
+const API_URL = import.meta.env.VITE_API_URL || 'https://a-b-testing-569o.onrender.com';
+// The API runs on Render's free tier, which sleeps when idle; a cold start
+// was measured at ~22 s, longer than the old 15 s timeout, so the first
+// prediction after idle always failed. Allow a full minute.
+const API_TIMEOUT_MS = 60_000;
+
 const initialFeatures = () => Object.fromEntries(Object.keys(FEATURE_RANGES).map(k => [k, 0.1]));
 
 const LTV = 10.0;
@@ -57,6 +63,17 @@ export default function InferenceEngine() {
   const [showHelp, setShowHelp] = useState(false);
   // dirty = features changed since last inference run
   const [dirty, setDirty] = useState(false);
+  // 'waking' until /health answers, so the user knows why the first run is slow.
+  const [apiState, setApiState] = useState('waking');
+
+  useEffect(() => {
+    let cancelled = false;
+    axios
+      .get(`${API_URL}/health`, { timeout: API_TIMEOUT_MS })
+      .then(() => { if (!cancelled) setApiState('ready'); })
+      .catch(() => { if (!cancelled) setApiState('down'); });
+    return () => { cancelled = true; };
+  }, []);
 
   const handleChange = (key, val) => {
     setFeatures(prev => ({ ...prev, [key]: Number(val) }));
@@ -84,8 +101,8 @@ export default function InferenceEngine() {
     setError(null);
     setResult(null); // clear previous result so UI shows loading state clearly
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://a-b-testing-569o.onrender.com';
-      const res = await axios.post(`${apiUrl}/predict`, features, { timeout: 15000 });
+      const res = await axios.post(`${API_URL}/predict`, features, { timeout: API_TIMEOUT_MS });
+      setApiState('ready');
       const entry = {
         ...res.data,
         timestamp: new Date().toLocaleTimeString(),
@@ -95,7 +112,12 @@ export default function InferenceEngine() {
       setHistory(h => [entry, ...h].slice(0, 6));
       setDirty(false);
     } catch (err) {
-      setError(err.response?.data?.detail ?? 'Could not connect to the inference API. Please ensure the backend service is running.');
+      const detail = err.response?.data?.detail;
+      setError(
+        typeof detail === 'string'
+          ? detail
+          : 'The inference API did not respond within 60 seconds. It runs on a free tier that sleeps when idle; please try again in a moment.'
+      );
     } finally {
       setLoading(false);
     }
@@ -330,7 +352,7 @@ export default function InferenceEngine() {
             {loading ? (
               <>
                 <div style={{ width: 16, height: 16, border: '2px solid rgba(10,13,20,0.3)', borderTopColor: '#0A0D14', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                Running Inference...
+                {apiState === 'ready' ? 'Running Inference...' : 'Waking the API (free tier, up to a minute)...'}
               </>
             ) : dirty && result ? (
               <><RotateCcw size={15} /> Re-run Inference</>
@@ -352,13 +374,6 @@ export default function InferenceEngine() {
               <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
               <span>
                 {error}
-                <br />
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.73rem' }}>
-                  Start the API:{' '}
-                  <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-amber)' }}>
-                    uvicorn api.main:app --port 8080
-                  </code>
-                </span>
               </span>
             </div>
           )}
@@ -374,7 +389,9 @@ export default function InferenceEngine() {
               {loading ? (
                 <div className="decision-idle">
                   <div style={{ width: 48, height: 48, borderRadius: '50%', border: '3px solid rgba(245,158,11,0.2)', borderTopColor: 'var(--accent-amber)', animation: 'spin 0.9s linear infinite' }} />
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Computing uplift...</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    {apiState === 'ready' ? 'Computing uplift...' : 'Waking the inference API...'}
+                  </p>
                 </div>
               ) : !result ? (
                 <div className="decision-idle">

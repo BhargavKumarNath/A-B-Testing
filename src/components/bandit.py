@@ -83,6 +83,7 @@ class BanditSimulator:
         cumulative_profit = 0.0
         
         history_profit = []
+        matched_profits = []  # realized profit of each matched event, for the bootstrap CI
         
         for i in range(len(X)):
             x_context = X[i]
@@ -111,6 +112,7 @@ class BanditSimulator:
                 agent.update(chosen_arm, x_context, scaled_reward)
                 
                 cumulative_profit += realized_profit
+                matched_profits.append(realized_profit)
                 aligned_counts += 1
                 history_profit.append(cumulative_profit)
                 
@@ -123,5 +125,6 @@ class BanditSimulator:
             "aligned_events": aligned_counts,
             "cumulative_reward": cumulative_profit,
             "avg_profit": avg_profit,
-            "history_reward": history_profit
+            "history_reward": history_profit,
+            "matched_profits": np.asarray(matched_profits, dtype=np.float64),
         }

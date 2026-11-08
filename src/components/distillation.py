@@ -11,11 +11,12 @@ logger = logging.getLogger(__name__)
 class DistillationEngine:
     """Compresses a complex Casual Model (Teacher) into a lightweight, interpretable model (Student) for low latency production inference"""
 
-    def __init__(self, teacher_model: Any, feature_cols: List[str], student_type: str = 'tree'):
+    def __init__(self, teacher_model: Any, feature_cols: List[str], student_type: str = 'tree', seed: int = 42):
         self.teacher = teacher_model
         self.features = feature_cols
         self.student = None
         self.student_type = student_type
+        self.seed = seed
 
     def train_student(self, df: pl.DataFrame, max_depth: int = 4):
         """Trains the student to mimic the teacher's CATE predictions"""
@@ -31,7 +32,7 @@ class DistillationEngine:
 
         # 2. Initialise Student
         if self.student_type == 'tree':
-            self.student = DecisionTreeRegressor(max_depth=max_depth, min_samples_leaf=50)
+            self.student = DecisionTreeRegressor(max_depth=max_depth, min_samples_leaf=50, random_state=self.seed)
         elif self.student_type == 'linear':
             self.student = LinearRegression()
         else:

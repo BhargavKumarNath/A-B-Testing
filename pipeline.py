@@ -14,6 +14,7 @@ from src.components.segmentation import SegmentAnalyzer
 from src.components.bandit import BanditSimulator 
 from src.components.distillation import DistillationEngine
 from src.components.exporter import PowerBIExporter
+from src.components.uncertainty import bootstrap_mean_ci
 from src.utils.plotting import plot_uplift_by_decile, plot_bootstrapped_qini, plot_bandit_performance
 
 # Configure Logging
@@ -28,6 +29,14 @@ FEATURE_COLS = [f"f{i}" for i in range(12)]
 # Business Params for Profit Bandit
 CONVERSION_VALUE = 10.0  # Revenue per conversion
 COST_PER_AD = 0.10       # Cost per impression
+
+# One seed for every random draw in the pipeline (train/test split, Qini
+# bootstrap, profit bootstrap, distilled tree, exporter samples). 42 is the
+# value the CUPED sample and the bandit stream already used; it was fixed
+# before any seeded run was looked at, and the run it produces is the one
+# reported. Earlier runs left the split unseeded, so no two runs matched.
+SEED = 42
+N_BOOT_PROFIT = 10_000
 
 def run_pipeline():
     start_time = time.time()
@@ -65,7 +74,8 @@ def run_pipeline():
     logger.info("Phase 3: Uplift Modeling (X-Learner)")
     
     # Random Split
-    df = df.with_columns(pl.Series(name="rand_split", values=np.random.rand(df.height)))
+    rng = np.random.default_rng(SEED)
+    df = df.with_columns(pl.Series(name="rand_split", values=rng.random(df.height)))
     train_df = df.filter(pl.col("rand_split") < 0.8)
     test_df = df.filter(pl.col("rand_split") >= 0.8)
     
@@ -84,7 +94,7 @@ def run_pipeline():
     
     # Bootstrapped Qini (Calculates 95% Confidence Intervals)
     # n_bootstraps=20 for speed in demo, use 100+ for prod
-    qini_data = evaluator.get_bootstrapped_qini(uplift_scores, n_bootstraps=20)
+    qini_data = evaluator.get_bootstrapped_qini(uplift_scores, n_bootstraps=20, seed=SEED)
     
     plot_uplift_by_decile(decile_stats, f"{OUTPUT_DIR}/uplift_deciles.png")
     plot_bootstrapped_qini(qini_data, f"{OUTPUT_DIR}/qini_curve.png")
@@ -96,7 +106,7 @@ def run_pipeline():
     # max_depth=5 matches the production distillation depth and powerbi.md specification.
     # max_depth=3 was the original demo setting; depth=5 produces richer rules for
     # the Page 5 tree rules viewer without sacrificing interpretability.
-    rules = analyzer.explain_with_surrogate(uplift_scores, max_depth=5)
+    rules = analyzer.explain_with_surrogate(uplift_scores, max_depth=5, seed=SEED)
     
     profile_df.to_csv(f"{OUTPUT_DIR}/segment_profile.csv")
     with open(f"{OUTPUT_DIR}/segment_rules.txt", "w") as f:
@@ -117,17 +127,35 @@ def run_pipeline():
     # If we treat everyone: Profit = (TreatmentCTR * Value) - Cost
     treatment_ctr = df.filter(pl.col("treatment") == 1)["conversion"].mean()
     baseline_profit_per_user = (treatment_ctr * CONVERSION_VALUE) - COST_PER_AD
-    
+
+    # 95% bootstrap intervals on every profit number, so the bandit's figure
+    # has a "compared to what" with its uncertainty attached. Treat-nobody
+    # (show no ads, pay nothing) is the second fixed policy a bidder could run.
+    # These intervals cover sampling noise in the evaluation rows; they do not
+    # cover variation from a different bandit stream order.
+    treat_profits = (
+        df.filter(pl.col("treatment") == 1)["conversion"].cast(pl.Float64).to_numpy() * CONVERSION_VALUE
+        - COST_PER_AD
+    )
+    control_profits = (
+        df.filter(pl.col("treatment") == 0)["conversion"].cast(pl.Float64).to_numpy() * CONVERSION_VALUE
+    )
+    profit_ci = {
+        "treat_everyone": bootstrap_mean_ci(treat_profits, n_boot=N_BOOT_PROFIT, seed=SEED).to_dict(),
+        "treat_nobody": bootstrap_mean_ci(control_profits, n_boot=N_BOOT_PROFIT, seed=SEED).to_dict(),
+        "bandit": bootstrap_mean_ci(bandit_res["matched_profits"], n_boot=N_BOOT_PROFIT, seed=SEED).to_dict(),
+    }
+
     logger.info("=== Economic Impact ===")
-    logger.info(f"Fixed Strategy Profit/User: ${baseline_profit_per_user:.4f}")
-    logger.info(f"Bandit Strategy Profit/User: ${bandit_res['avg_profit']:.4f}")
+    for name, ci in profit_ci.items():
+        logger.info(f"{name:>15} Profit/User: ${ci['mean']:.4f}  95% CI [{ci['lower']:.4f}, {ci['upper']:.4f}]  n={ci['n']:,}")
     
     plot_bandit_performance(bandit_res['history_reward'], baseline_profit_per_user, f"{OUTPUT_DIR}/bandit_profit.png")
     
     # 8. Engineering: Knowledge Distillation
     logger.info("Phase 7: Production Engineering (Distillation)")
     # Compressing the heavy X-Learner into a fast Student model
-    distiller = DistillationEngine(teacher_model=learner, feature_cols=FEATURE_COLS, student_type='tree')
+    distiller = DistillationEngine(teacher_model=learner, feature_cols=FEATURE_COLS, student_type='tree', seed=SEED)
     r2_score = distiller.train_student(test_df, max_depth=5)
     
     distiller.save_student(f"{OUTPUT_DIR}/production_uplift_model.pkl")
@@ -160,6 +188,7 @@ def run_pipeline():
         student_r2          = r2_score,
         conversion_value    = CONVERSION_VALUE,
         cost_per_ad         = COST_PER_AD,
+        seed                = SEED,
     )
     export_paths = exporter.export_all()
     logger.info(f"Power BI exports complete: {len(export_paths)} files in {OUTPUT_DIR}/data/")
@@ -172,7 +201,10 @@ def run_pipeline():
             "bandit_profit_per_user": bandit_res['avg_profit'],
             "global_ate_absolute": ate_result.absolute_effect,
             "global_ate_relative": ate_result.relative_effect,
-            "student_r2": r2_score
+            "student_r2": r2_score,
+            "treat_nobody_profit_per_user": profit_ci["treat_nobody"]["mean"],
+            "profit_ci_95": profit_ci,
+            "seed": SEED,
         },
         "decile_stats": decile_stats.to_pandas().to_dict(orient="records"),
         "qini_data": {k: (v.tolist() if isinstance(v, np.ndarray) else v) for k, v in qini_data.items()},
@@ -184,6 +216,30 @@ def run_pipeline():
     with open(frontend_dir / "insights.json", "w") as f:
         json.dump(insights, f, indent=2)
     logger.info("Insights saved to frontend/public/insights.json")
+
+    # One record of this run's headline numbers, written to disk.
+    run_record = {
+        "seed": SEED,
+        "rows": df.height,
+        "train_rows": train_df.height,
+        "test_rows": test_df.height,
+        "global_ate_absolute": ate_result.absolute_effect,
+        "global_ate_relative": ate_result.relative_effect,
+        "auuc_mean": float(qini_data["auuc_mean"]),
+        "auuc_std": float(qini_data["auuc_std"]),
+        "student_r2": float(r2_score),
+        "bandit_aligned_events": bandit_res["aligned_events"],
+        "surrogate_feature_importance": {
+            f: float(v) for f, v in zip(FEATURE_COLS, analyzer.tree_model.feature_importances_)
+        },
+        "profit_ci_95": profit_ci,
+        "conversion_value": CONVERSION_VALUE,
+        "cost_per_ad": COST_PER_AD,
+    }
+    Path(OUTPUT_DIR, "reports").mkdir(parents=True, exist_ok=True)
+    with open(Path(OUTPUT_DIR, "reports", "run_metrics.json"), "w") as f:
+        json.dump(run_record, f, indent=2)
+    logger.info("Run metrics saved to results/reports/run_metrics.json")
 
 if __name__ == "__main__":
     run_pipeline()

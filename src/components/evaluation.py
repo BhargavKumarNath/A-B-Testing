@@ -91,7 +91,7 @@ class UpliftEvaluator:
             "auuc": auuc
         }
 
-    def get_bootstrapped_qini(self, pred_uplift: np.ndarray, n_bootstraps: int = 50) -> Dict:
+    def get_bootstrapped_qini(self, pred_uplift: np.ndarray, n_bootstraps: int = 50, seed: int = 42) -> Dict:
         """
         Calculates Qini curve with Confidence Intervals using Bootstrapping.
         Resamples the dataset N times to estimate uncertainty.
@@ -108,10 +108,11 @@ class UpliftEvaluator:
         common_x = np.linspace(0, 1, 1000)
         bootstrapped_curves = []
         auucs = []
+        rng = np.random.default_rng(seed)
         
         for i in range(n_bootstraps):
             # Resample indices with replacement
-            indices = np.random.randint(0, n_samples, n_samples)
+            indices = rng.integers(0, n_samples, n_samples)
             
             t_b = t_full[indices]
             y_b = y_full[indices]

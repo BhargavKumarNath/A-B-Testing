@@ -50,14 +50,14 @@ class SegmentAnalyzer:
         profile_df["Abs Diff"] = profile_df["Diff %"].abs()
         return profile_df.sort_values("Abs Diff", ascending=False).drop(columns=["Abs Diff"])
     
-    def explain_with_surrogate(self, uplift_scores: np.ndarray, max_depth: int = 3, min_samples_leaf: int = 50) -> str:
+    def explain_with_surrogate(self, uplift_scores: np.ndarray, max_depth: int = 3, min_samples_leaf: int = 50, seed: int = 42) -> str:
         """Trains a simple Decision Tree Regressor to approx. the complex T-Learner"""
         logger.info("Training surrogate model to explain segments...")
         
         X = self.df.select(self.feature_cols).to_numpy()
         y = uplift_scores
         
-        tree_model = DecisionTreeRegressor(max_depth=max_depth, min_samples_leaf=min_samples_leaf)
+        tree_model = DecisionTreeRegressor(max_depth=max_depth, min_samples_leaf=min_samples_leaf, random_state=seed)
         tree_model.fit(X, y)
         
         # Extract Rules

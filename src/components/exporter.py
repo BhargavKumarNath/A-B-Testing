@@ -138,6 +138,7 @@ class PowerBIExporter:
         conversion_value: float,
         cost_per_ad: float,
         run_date: Optional[str] = None,
+        seed: int = 42,
     ):
         self.output_dir     = Path(output_dir) / "data"
         self.feature_cols   = feature_cols
@@ -158,6 +159,7 @@ class PowerBIExporter:
         self.conversion_value = conversion_value
         self.cost_per_ad    = cost_per_ad
         self.run_date       = run_date or str(date.today())
+        self.seed           = seed
 
         # Cached baseline conversion probabilities (computed once on demand)
         self._baseline_probs: Optional[np.ndarray] = None
@@ -1013,6 +1015,7 @@ class PowerBIExporter:
         # Bid threshold: CATE × LTV > Cost
         bid_threshold = self.cost_per_ad / self.conversion_value
 
+        drift_rng = np.random.default_rng(self.seed)
         for week in range(MONITORING_WEEKS):
             start = week * week_size
             end   = start + week_size if week < MONITORING_WEEKS - 1 else n_test
@@ -1056,7 +1059,7 @@ class PowerBIExporter:
             # ── CATE distribution sample for drift histogram ──────────────
             # Sample 500 per week for the distribution comparison visual
             n_drift_sample = min(500, len(uplift_slice))
-            sampled_uplift = np.random.choice(uplift_slice, size=n_drift_sample, replace=False)
+            sampled_uplift = drift_rng.choice(uplift_slice, size=n_drift_sample, replace=False)
             for val in sampled_uplift:
                 drift_rows.append({
                     "week"        : week + 1,
