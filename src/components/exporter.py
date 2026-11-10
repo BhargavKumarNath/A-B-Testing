@@ -352,7 +352,8 @@ class PowerBIExporter:
             "conversion_value"         : self.conversion_value,
             "cost_per_ad"              : self.cost_per_ad,
             "baseline_profit_per_user" : round(self.baseline_profit_per_user, 6),
-            "bandit_profit_per_user"   : round(self.bandit_res["avg_profit"],  6),
+            "bandit_profit_per_user"   : round(self.bandit_res["ipw_profit"]["bandit"], 6),
+            "bandit_profit_replay"     : round(self.bandit_res["avg_profit"],  6),
             "bandit_aligned_events"    : self.bandit_res["aligned_events"],
             # ── Distillation ──────────────────────────────────────────────
             "student_r2"               : round(self.student_r2,     4),

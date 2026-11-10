@@ -198,7 +198,12 @@ def run_pipeline():
     insights = {
         "metrics": {
             "baseline_profit_per_user": baseline_profit_per_user,
-            "bandit_profit_per_user": bandit_res['avg_profit'],
+            # Headline = inverse-propensity score of the bandit's decisions on every event; the replay
+            # average (matched events only) is over-weighted toward treated contexts under the 85/15 log.
+            "bandit_profit_per_user": bandit_res['ipw_profit']['bandit'],
+            "bandit_profit_replay": bandit_res['avg_profit'],
+            "treat_nobody_profit_ipw": bandit_res['ipw_profit']['treat_none'],
+            "bandit_share_treated": bandit_res['ipw_profit']['share_treated'],
             "global_ate_absolute": ate_result.absolute_effect,
             "global_ate_relative": ate_result.relative_effect,
             "student_r2": r2_score,

@@ -20,7 +20,7 @@ Traditional A/B testing on advertising campaigns showed that broad targeting inc
 We built an end-to-end machine learning pipeline to transition from descriptive analytics ("What happened?") to prescriptive intervention ("Who should we target?"). Using advanced modeling techniques and Contextual Bandits, we successfully isolated the sub-population of "Persuadable" users.
 
 **The Impact:**
-* **Profitability:** Turned negative margins into a positive outcome: the profit-aware bandit earns +$0.072 per user (95% CI +$0.068 to +$0.076) against -$0.069 for showing everyone the ad, and against +$0.019 for showing no one the ad. See [Results and their uncertainty](#results-and-their-uncertainty).
+* **Profitability:** Turned negative margins into a positive outcome: the profit-aware bandit earns +$0.022 per user (95% CI +$0.021 to +$0.024, every replayed event scored with inverse-propensity weights) against -$0.068 for showing everyone the ad, but that is level with the +$0.021 for showing no one the ad. An earlier +$0.072 replay figure was inflated by the estimator; see the correction below. See [Results and their uncertainty](#results-and-their-uncertainty).
 * **Efficiency:** Drastically reduced ad spend volume while capturing the true value of the campaign.
 * **Production Readiness:** Compressed complex models into a high-speed Decision Tree for Real-Time Bidding (RTB).
 
@@ -56,7 +56,7 @@ The workflow is divided into three main areas: the offline data pipeline, the ba
 | :--- | :--- | :--- | :--- |
 | Conversion Rate | 0.31% | 1.90% | **+512%** |
 | Lift | +59.4% | +350% | **6x Precision** |
-| Net Profit per User | -$0.069 (Loss) | +$0.072 (Profit) | **Turnaround** |
+| Net Profit per User | -$0.068 (Loss) | +$0.022 (IPW, level with showing no one the ad) | **Loss removed, no gain over doing nothing** |
 | Inference Latency | N/A | < 1ms | **Ready for Live Bidding** |
 
 **Key Insight:**  
@@ -74,7 +74,32 @@ Profit per user at $10 per conversion and $0.10 per ad, with 95% bootstrap inter
 | Show no one the ad | +$0.0194 | +$0.0188 to +$0.0200 | 2,096,937 control users |
 | Profit-aware LinUCB bandit (replay) | **+$0.0720** | +$0.0676 to +$0.0763 | 172,290 matched of 1,000,000 replayed |
 
-The bandit beats both fixed policies with intervals that do not overlap. The interval covers sampling noise in the evaluation rows only; it does not cover what a different replay order would do to the bandit's learning. Numbers are written to `frontend/public/insights.json` (`profit_ci_95`) and `results/reports/run_metrics.json` on every run.
+The replay row is the figure this README used to headline. It averages profit over only the events where the bandit's arm equals the logged arm. Treatment was logged for 85% of users, so a match is much more likely when the bandit chooses "treat", and the users it treats are over-weighted. The next table scores the same decisions on all 1,000,000 events with inverse-propensity weights (`experiments/phase4/p4_bandit_ipw.py`):
+
+| Policy | Profit per user (IPW) | 95% CI |
+| :--- | :--- | :--- |
+| Profit-aware LinUCB bandit (treats 3.1% of users) | **+$0.0224** | +$0.0207 to +$0.0243 |
+| Show no one the ad | +$0.0212 | +$0.0189 to +$0.0237 |
+| Show everyone the ad | -$0.0679 | -$0.0691 to -$0.0667 |
+
+Bandit minus show-no-one: +$0.0012 (95% CI -$0.0008 to +$0.0030). The bandit removes the loss of the blanket campaign but does not beat doing nothing. The "Conversion Rate" and "Lift" rows in the Key Results table and the distillation profit audit come from the earlier replay write-up and have not been re-scored.
+
+### Phase 4: model comparison and threshold sensitivity
+
+Protocol: [`docs/phase4_protocol.md`](docs/phase4_protocol.md) (written before scoring). Models are fit on 60% of the rows; the CATE threshold is chosen on a 20% validation split; the last 20% (the pipeline's 2,796,971 test rows) is scored once. Profit per user of the policy "treat the top k% by score", inverse-propensity estimate, 95% bootstrap CI (`results/phase4/uplift_baselines.json`):
+
+| Method | Top 10% | Top 20% | Top 30% | AUUC above random |
+| :--- | :--- | :--- | :--- | :--- |
+| X-Learner | +$0.0192 (0.0184 to 0.0201) | +$0.0097 (0.0089 to 0.0105) | -$0.0001 (-0.0009 to 0.0007) | 1,083 (892 to 1,302) |
+| T-Learner | +$0.0181 (0.0172 to 0.0191) | +$0.0089 (0.0080 to 0.0099) | -$0.0010 (-0.0019 to -0.0001) | 800 (613 to 1,048) |
+| Plain response model | +$0.0199 (0.0191 to 0.0207) | +$0.0103 (0.0096 to 0.0111) | +$0.0008 (0.0001 to 0.0015) | 1,380 (1,126 to 1,504) |
+| Random | +$0.0108 (0.0096 to 0.0121) | +$0.0020 (0.0009 to 0.0031) | -$0.0068 (-0.0078 to -0.0059) | 2 (-108 to 128) |
+
+The X-Learner beats the T-Learner (paired difference at 10%: +$0.0011, CI +0.0003 to +0.0018) and random targeting, and is behind a plain response model at every budget (paired difference at 10%: -$0.0006, CI -0.0011 to -0.0001). The same holds for AUUC.
+
+CATE threshold (treat if predicted CATE > tau), X-Learner, test split: tau 0.005 earns +$0.0242 (validation-best), 0.01 +$0.0238, the shipped 0.02 +$0.0229, 0.04 +$0.0220, show no one +$0.0197, treat everyone -$0.0687. The shipped 0.02 earns $0.0014 less per user than 0.005 (paired CI -0.0021 to -0.0007). It is left at 0.02 because moving it changes the segment rules and the dashboard for a small gain.
+
+Intervals cover test-row sampling only: one split, one seed.
 
 ## Setup and Installation
 

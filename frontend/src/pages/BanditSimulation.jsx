@@ -69,13 +69,13 @@ export default function BanditSimulation({ insights }) {
 
   const crossoverX = trajectoryData[crossoverIndex]?.x;
   const improvement = metrics.bandit_profit_per_user - metrics.baseline_profit_per_user;
-  const bidsPlaced = Math.round(totalAligned * 0.17);
+  const bidsPlaced = Math.round(1000000 * (metrics.bandit_share_treated ?? 0.031));
 
   // Funnel stages
   const FUNNEL = [
     { label: '1M Event Stream',     value: '1,000,000',   sublabel: '100%',  pct: 100, gradient: 'linear-gradient(90deg, rgba(245,158,11,0.6), rgba(245,158,11,0.3))' },
     { label: 'Replay Matched',      value: '169,473',     sublabel: '16.9%', pct: 16.9, gradient: 'linear-gradient(90deg, rgba(6,182,212,0.6), rgba(6,182,212,0.3))' },
-    { label: 'Bandit Bids Placed',  value: `~${bidsPlaced.toLocaleString()}`, sublabel: '~17%', pct: 2.9, gradient: 'linear-gradient(90deg, rgba(16,185,129,0.7), rgba(16,185,129,0.35))' },
+    { label: 'Bandit Bids Placed',  value: `~${bidsPlaced.toLocaleString()}`, sublabel: '3.1% of all events', pct: 3.1, gradient: 'linear-gradient(90deg, rgba(16,185,129,0.7), rgba(16,185,129,0.35))' },
     { label: 'Profitable Outcomes', value: 'Positive ROI',sublabel: 'Policy', pct: 1.8, gradient: 'linear-gradient(90deg, rgba(245,158,11,0.8), rgba(249,115,22,0.5))' },
   ];
 
@@ -88,9 +88,9 @@ export default function BanditSimulation({ insights }) {
     },
     {
       icon: TrendingUp, iconCls: 'emerald', glowCls: 'emerald',
-      label: 'Bandit Profit / User', numCls: 'emerald',
+      label: 'Bandit Profit / User (IPW, all events)', numCls: 'emerald',
       number: <><span style={{ fontSize: '1.6rem', fontFamily: 'var(--font-mono)' }}>+$</span><AnimatedNumber value={metrics.bandit_profit_per_user} decimals={4} /></>,
-      pill: { label: '↑ LinUCB Adaptive Policy', type: 'up' },
+      pill: { label: '≈ Level with showing no one the ad', type: 'neutral' },
     },
     {
       icon: Activity, iconCls: 'amber', glowCls: 'amber',
@@ -130,9 +130,10 @@ export default function BanditSimulation({ insights }) {
           <div className="narrative-banner-text">
             From 1 million raw impressions, only{' '}
             <strong style={{ color: 'var(--accent-amber-light)' }}>169,473 matched</strong> (replay constraint).
-            Of those, the bandit placed bids on roughly{' '}
-            <strong style={{ color: 'var(--accent-emerald)' }}>17%</strong>, skipping 83%, yet generated
-            a positive P&L that the full-rollout baseline couldn't achieve.
+            Across all 1M events the bandit chose to treat only{' '}
+            <strong style={{ color: 'var(--accent-emerald)' }}>3.1%</strong> of users. Scored on every event it earns
+            about the same as showing no one the ad, and far more than the full-rollout baseline loses. The earlier
+            +$0.072 averaged only the matched events and over-weighted the users it treats.
           </div>
         </div>
       </FadeIn>
@@ -272,7 +273,7 @@ export default function BanditSimulation({ insights }) {
                   cls: 'amber',
                   icon: '📌',
                   title: 'Key Assumption',
-                  body: 'Off-policy replay requires the logging policy (randomised experiment, 85% treatment) to have sufficient support. With 85% treatment, all profitable contexts are represented in the replay stream.',
+                  body: 'Replay averages only matched events. With an 85/15 logging policy a match is far likelier when the bandit picks treat, so treated contexts are over-weighted. The headline here is therefore the inverse-propensity score on all 1M events.',
                 },
               ].map(({ cls, icon, title, body }) => (
                 <div key={title} className={`insight-panel ${cls}`}>
@@ -299,7 +300,7 @@ export default function BanditSimulation({ insights }) {
             {[
               { n: '01', c: 'amber',  title: 'Context Arrival',    desc: 'User context vector x ∈ ℝ¹² arrives. Agent decides: Show ad (arm 1) or skip (arm 0).' },
               { n: '02', c: 'violet', title: 'UCB Selection',      desc: 'UCB(a) = θₐᵀ·x + α·√(xᵀ·Aₐ⁻¹·x). Agent selects argmax. α controls exploration.' },
-              { n: '03', c: 'amber',  title: 'Replay Matching',    desc: 'Accept only if chosen arm matches historical treatment. Ensures unbiased off-policy evaluation.' },
+              { n: '03', c: 'amber',  title: 'Replay Matching',    desc: 'Accept only if chosen arm matches historical treatment. Unbiased only when the logging policy is uniform; here (85/15) it is not, so profit is re-scored with inverse-propensity weights.' },
               { n: '04', c: 'green',  title: 'Profit-Aware Update',desc: 'Reward = (Conv × LTV) − Cost. Aₐ += xxᵀ, bₐ += reward·x. Bandit learns profitable features.' },
             ].map(({ n, c, title, desc }) => (
               <div key={n} style={{ padding: '16px', borderRadius: 10, background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-subtle)' }}>

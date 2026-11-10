@@ -83,6 +83,7 @@ class BanditSimulator:
         cumulative_profit = 0.0
         
         history_profit = []
+        chosen_arms = np.empty(len(X), dtype=np.float64)  # (n,) arm picked on every event, matched or not
         matched_profits = []  # realized profit of each matched event, for the bootstrap CI
         
         for i in range(len(X)):
@@ -100,6 +101,7 @@ class BanditSimulator:
             
             # 1. Agent chooses arm
             chosen_arm = agent.select_arm(x_context)
+            chosen_arms[i] = chosen_arm
             
             # 2. Replay Logic (Match?)
             if chosen_arm == actual_treatment:
@@ -121,10 +123,37 @@ class BanditSimulator:
         logger.info(f"Replay Complete. Matches: {aligned_counts}/{sample_size}")
         logger.info(f"Avg Profit per User: ${avg_profit:.4f}")
         
+        # Inverse-propensity score of the same decisions on EVERY event. The replay average above uses only
+        # matched events; with a non-uniform logging policy (85% treated) matching is likelier when the agent
+        # picks "treat", which over-weights the contexts it treats. IPW removes that bias.
+        ipw = self.ipw_profit(chosen_arms, treatments.astype(np.float64), conversions.astype(np.float64),
+                              conversion_value, cost_per_ad)
+        logger.info(f"IPW profit per user (all events): ${ipw['bandit']:.4f}; treat-none ${ipw['treat_none']:.4f}")
+
         return {
+            "ipw_profit": ipw,
+            "chosen_arms": chosen_arms,
             "aligned_events": aligned_counts,
             "cumulative_reward": cumulative_profit,
             "avg_profit": avg_profit,
             "history_reward": history_profit,
             "matched_profits": np.asarray(matched_profits, dtype=np.float64),
         }
+    @staticmethod
+    def ipw_profit(arms: np.ndarray, treatment: np.ndarray, conversion: np.ndarray,
+                   conversion_value: float = 10.0, cost_per_ad: float = 0.10) -> Dict[str, float]:
+        """Unbiased profit per user of a 0/1 policy from a randomised log with P(treated) = mean(treatment).
+
+        value = mean( pi*T/p*(V*Y - c) + (1-pi)*(1-T)/(1-p)*V*Y ).  All inputs have shape (n,).
+        """
+        assert arms.shape == treatment.shape == conversion.shape and arms.ndim == 1
+        p = float(treatment.mean())
+        assert 0.0 < p < 1.0, "needs both treated and control rows"
+
+        def value(pi: np.ndarray) -> float:
+            return float(np.mean(pi * treatment / p * (conversion_value * conversion - cost_per_ad)
+                                 + (1 - pi) * (1 - treatment) / (1 - p) * conversion_value * conversion))
+
+        n = len(arms)
+        return {"bandit": value(arms), "treat_all": value(np.ones(n)), "treat_none": value(np.zeros(n)),
+                "share_treated": float(arms.mean())}

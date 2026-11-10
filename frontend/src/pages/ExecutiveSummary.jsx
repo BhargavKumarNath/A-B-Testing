@@ -109,10 +109,10 @@ export default function ExecutiveSummary({ insights }) {
     },
     {
       icon: DollarSign, iconCls: 'emerald', glowCls: 'emerald',
-      label: 'Bandit Profit / User',
+      label: 'Bandit Profit / User (IPW)',
       number: <><span style={{ fontSize: '2rem' }}>+$</span><AnimatedNumber value={metrics.bandit_profit_per_user} decimals={4} /></>,
       numCls: 'emerald',
-      pill: { label: '↑ Profitable', type: 'up' },
+      pill: { label: '≈ Same as showing no one', type: 'neutral' },
       sparkData: SPARKLINES.profit, sparkColor: '#10B981',
     },
     {
@@ -218,8 +218,10 @@ export default function ExecutiveSummary({ insights }) {
               </BarChart>
             </ResponsiveContainer>
             <div className="insight-caption">
-              The Causal Bandit flips the sign entirely. Not marginal improvement but a{' '}
-              <strong>fundamental strategy switch</strong> from "treat everyone" to "treat only Persuadables."
+              The bandit removes the loss: it moves from "treat everyone" to treating about{' '}
+              <strong>3% of users</strong>. Scored on every event it earns the same as showing no one the ad
+              (+$0.0212, 95% CI +$0.0189 to +$0.0237), so the gain over doing nothing is not established.
+              An earlier +$0.072 replay figure over-weighted the users it treats.
             </div>
           </div>
         </FadeIn>
@@ -313,7 +315,7 @@ export default function ExecutiveSummary({ insights }) {
                 { n: '01', c: 'amber',  title: 'Experiment Validation', desc: 'SRM Chi-Square test + SMD audit confirmed the 85/15 traffic split was clean and groups were covariate-balanced. The data was trustworthy.' },
                 { n: '02', c: 'rose',   title: 'The Profitability Trap', desc: 'A/B test showed +59.4% lift. But (Lift × $10 LTV) = $0.001 < $0.10 cost-per-ad. Statistically significant, economically disastrous.' },
                 { n: '03', c: 'violet', title: 'X-Learner CATE Estimation', desc: `Trained a 4-stage LightGBM meta-learner to predict individual treatment effects. Decile 9 showed ${liftMultiple}× the population average uplift.` },
-                { n: '04', c: 'green',  title: 'Profit-Aware LinUCB Bandit', desc: 'Replayed 1M impressions with a bandit optimizing (Uplift × LTV) > Cost. Policy learned to skip Lost Causes, turning the campaign profitable.' },
+                { n: '04', c: 'green',  title: 'Profit-Aware LinUCB Bandit', desc: 'Replayed 1M impressions with a bandit optimizing (Uplift × LTV) > Cost. The policy learned to skip most users, which removes the loss of the blanket campaign.' },
                 { n: '05', c: 'amber',  title: 'Knowledge Distillation', desc: `Complex X-Learner ensemble compressed to a depth-5 Decision Tree with ${(metrics.student_r2 * 100).toFixed(1)}% R² fidelity. Sub-millisecond RTB-ready inference.` },
               ].map(({ n, c, title, desc }) => (
                 <div key={n} className="step-item">

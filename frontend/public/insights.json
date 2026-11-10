@@ -1,7 +1,7 @@
 {
   "metrics": {
     "baseline_profit_per_user": -0.06910538932587036,
-    "bandit_profit_per_user": 0.07195426316092246,
+    "bandit_profit_per_user": 0.022438251460064444,
     "global_ate_absolute": 0.0011518730521316279,
     "global_ate_relative": 0.594488117725262,
     "student_r2": 0.6573185256241454,
@@ -33,9 +33,31 @@
         "n_boot": 10000,
         "level": 0.95,
         "seed": 42
+      },
+      "bandit_ipw": {
+        "mean": 0.022438251460064444,
+        "lower": 0.020652851151679103,
+        "upper": 0.0243179516836203,
+        "n": 1000000,
+        "n_boot": 1000,
+        "level": 0.95,
+        "seed": 0
+      },
+      "treat_nobody_ipw": {
+        "mean": 0.021207493314304382,
+        "lower": 0.018940025475668067,
+        "upper": 0.023676699100348784,
+        "n": 1000000,
+        "n_boot": 1000,
+        "level": 0.95,
+        "seed": 0
       }
     },
-    "seed": 42
+    "seed": 42,
+    "bandit_profit_replay": 0.07195426316092246,
+    "bandit_profit_estimator": "inverse-propensity weighting over 1,000,000 replayed events (results/phase4/bandit_ipw.json); bandit_profit_replay is the matched-events average",
+    "treat_nobody_profit_ipw": 0.021207493314304382,
+    "bandit_share_treated": 0.030517
   },
   "decile_stats": [
     {
